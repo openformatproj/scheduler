@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 import scheduler.engine as sched
+import scheduler.conf as conf
 
 day = timedelta(days=1)
 
@@ -29,7 +30,7 @@ try:
     print('\nInitializing project...\n')
     project = sched.Project(tasks, day)
     project.init_tasks_dependencies()
-    project.init_solver(sched.Optimizers.project_completion_0, 'SCIP')
+    project.init_solver(conf.Optimizers.project_completion_0, 'SCIP')
     print('... OK, running solver...\n')
     project.solve()
     print('... OK, showing results:\n')
