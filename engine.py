@@ -153,32 +153,35 @@ class Project:
         for i in self.workers_indexes:
             for j in self.tasks_indexes:
                 for k in self.time_units_indexes:
-                    self.working_variables[i,j,k] = self.solver.IntVar(0, 1, "work")
+                    self.working_variables[i,j,k] = self.solver.IntVar(0, 1, "working")
                     if not self.tasks[j].worker == self.workers[i]:
                         self.solver.Add(self.working_variables[i,j,k] == 0) # Only worker i can work on task j
             for k in self.time_units_indexes:
                 self.solver.Add(self.solver.Sum([self.working_variables[i,j,k] for j in self.tasks_indexes]) <= 1) # Each worker is assigned to at most 1 task
         for j in self.tasks_indexes:
-            self.solver.Add(self.solver.Sum([self.working_variables[i,j,k] for i in self.workers_indexes for k in self.time_units_indexes]) == self.tasks[j].time // self.time_unit) # Task j must execute for self.tasks[j].time
-            for k in self.time_units_indexes:
-                self.completion_variables[j,k] = self.solver.IntVar(0, 1, "completed")
-                self.solver.Add(self.solver.Sum([self.working_variables[i,j,kk] for i in self.workers_indexes for kk in range(k)]) >= (self.tasks[j].time // self.time_unit) * self.completion_variables[j,k]) # self.completion_variables[j,k] can be 1 only if task j completed before unit of time k
-            if not self.graph is None and self.tasks[j].identifier in list(self.graph.nodes):
-                ancestors = []
-                for ancestor_identifier in list(nx.ancestors(self.graph, self.tasks[j].identifier)):
-                    for task in self.tasks:
-                        if task.identifier == ancestor_identifier:
-                            ancestors.append(task)
-                            break
-                ancestor_indexes = []
-                for task in ancestors:
-                    for jj in self.tasks_indexes:
-                        if self.tasks[jj] == task:
-                            ancestor_indexes.append(jj)
-                            break
+            if not self.graph is None:
                 for k in self.time_units_indexes:
-                    for i in self.workers_indexes:
-                        self.solver.Add(self.solver.Sum([self.completion_variables[jj,k] for jj in ancestor_indexes]) >= len(ancestor_indexes)*self.working_variables[i,j,k]) # Task j can execute only after all its ancestors have completed
+                    self.completion_variables[j,k] = self.solver.IntVar(0, 1, "completion")
+            for i in self.workers_indexes:
+                if self.tasks[j].worker == self.workers[i]:
+                    self.solver.Add(self.solver.Sum([self.working_variables[i,j,k] for k in self.time_units_indexes]) == self.tasks[j].time // self.time_unit) # Task j must execute for self.tasks[j].time
+                    if not self.graph is None and self.tasks[j].identifier in list(self.graph.nodes):
+                        ancestors = []
+                        for ancestor_identifier in list(nx.ancestors(self.graph, self.tasks[j].identifier)):
+                            for task in self.tasks:
+                                if task.identifier == ancestor_identifier:
+                                    ancestors.append(task)
+                                    break
+                        ancestor_indexes = []
+                        for task in ancestors:
+                            for jj in self.tasks_indexes:
+                                if self.tasks[jj] == task:
+                                    ancestor_indexes.append(jj)
+                                    break
+                        for k in self.time_units_indexes:
+                            self.solver.Add(self.solver.Sum([self.working_variables[i,j,kk] for kk in range(k)]) >= (self.tasks[j].time // self.time_unit) * self.completion_variables[j,k]) # self.completion_variables[j,k] can be 1 only if task j completed before unit of time k
+                            self.solver.Add(self.solver.Sum([self.completion_variables[jj,k] for jj in ancestor_indexes]) >= len(ancestor_indexes)*self.working_variables[i,j,k]) # Task j can execute only after all its ancestors have completed
+                    break
         opt(self)
 
     def solve(self) -> None:
